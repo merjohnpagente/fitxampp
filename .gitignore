@@ -1,0 +1,6 @@
+.opencode/node_modules/
+.opencode/cache/
+*.log
+.env
+.DS_Store
+Thumbs.db
