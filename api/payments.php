@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -39,6 +39,7 @@ if ($method === 'POST') {
     $pdo->prepare("UPDATE members SET expiry_date=?, plan_id=?, status='Active' WHERE id=?")->execute([$newExpiry, $planId, $memberId]);
     $pdo->prepare("UPDATE notifications SET status='resolved' WHERE member_id=? AND status='open'")->execute([$memberId]);
     $pdo->prepare("INSERT INTO activity_log (id, action, category, detail, extra, by_name, by_username, by_role, at) VALUES (?,?,?,?,?,?,?,?,NOW())")
-        ->execute([gen_uid('ACT'), 'Payment', 'Billing', $m['name'], 'Plan: '.$plan['name'].' | ₱'.$amount.' | Expiry: '.$newExpiry, $user['name'], $user['username'], $user['role']]);
+        ->execute([gen_uid('ACT'), 'Payment', 'Billing', $m['name'], 'Plan: '.$plan['name'].' | â‚±'.$amount.' | Expiry: '.$newExpiry, $user['name'], $user['username'], $user['role']]);
     json_ok(['id'=>$id, 'new_expiry'=>$newExpiry]);
 }
+

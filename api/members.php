@@ -1,7 +1,7 @@
-<?php
-// api/members.php — list, get, create, update, archive, check-in
+﻿<?php
+// api/members.php â€” list, get, create, update, archive, check-in
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -143,7 +143,7 @@ if ($method === 'POST') {
         $pdo->prepare("UPDATE notifications SET status='resolved' WHERE member_id=? AND status='open'")->execute([$memberId]);
         // activity
         $pdo->prepare("INSERT INTO activity_log (id, action, category, detail, extra, by_name, by_username, by_role, at) VALUES (?,?,?,?,?,?,?,?,NOW())")
-            ->execute([gen_uid('ACT'), 'Confirmed Payment', 'Member', $m['name'], 'Plan: '.$plan['name'].' | Amount: ₱'.$amount, $user['name'], $user['username'], $user['role']]);
+            ->execute([gen_uid('ACT'), 'Confirmed Payment', 'Member', $m['name'], 'Plan: '.$plan['name'].' | Amount: â‚±'.$amount, $user['name'], $user['username'], $user['role']]);
         json_ok(['msg'=>'Payment confirmed', 'expiry'=>$expiry]);
     }
 
@@ -157,3 +157,4 @@ if ($method === 'DELETE') {
     $pdo->prepare("DELETE FROM members WHERE id=?")->execute([$id]);
     json_ok(['msg'=>'Deleted']);
 }
+

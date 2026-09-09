@@ -1,7 +1,7 @@
 <?php
 // check.php — XAMPP diagnostic page
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/db.php';
 
 header('Content-Type: text/html; charset=utf-8');
 echo "<!DOCTYPE html><html><head><meta charset='utf-8'><title>FITCORE — XAMPP Check</title>";
@@ -52,5 +52,5 @@ echo "<li>Default logins: <code>admin / admin123</code> (Admin), <code>staff / s
 echo "<li>If you open via <code>file://</code> double-click, it still works offline (localStorage demo mode).</li>";
 echo "</ol></div>";
 
-echo "<p><a href='index.html'>→ Go to FITCORE</a> &nbsp; | &nbsp; <a href='database.sql' download>Download database.sql</a></p>";
+echo "<p><a href='index.html'>→ Go to FITCORE</a> &nbsp; | &nbsp; <a href='sql/database.sql' download>Download database.sql</a></p>";
 echo "</body></html>";

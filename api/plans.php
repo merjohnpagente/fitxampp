@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -52,3 +52,4 @@ if ($method === 'DELETE') {
     $pdo->prepare("DELETE FROM plans WHERE id=?")->execute([$id]);
     json_ok(['msg'=>'Deleted']);
 }
+

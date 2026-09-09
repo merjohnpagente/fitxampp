@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 $pdo=getDB();
 
 // GET: aggregated reports
@@ -26,3 +26,4 @@ if($type==='activity'){
     json_ok(['activity'=>$stmt->fetchAll()]);
 }
 json_err('Unknown report type',400);
+

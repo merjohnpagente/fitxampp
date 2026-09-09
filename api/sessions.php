@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 $pdo=getDB();
 $method=$_SERVER['REQUEST_METHOD'];
 $input=json_decode(file_get_contents('php://input'),true)??[];
@@ -32,7 +32,7 @@ if($method==='POST'){
         $stmt=$pdo->prepare("SELECT * FROM sessions WHERE trainer_id=? AND date=? AND status!='Cancelled'");
         $stmt->execute([$trainerId,$date]);
         foreach($stmt->fetchAll() as $s){
-            // simple string compare (HH:MM AM/PM) — convert to minutes
+            // simple string compare (HH:MM AM/PM) â€” convert to minutes
             // assume format like "6:00 AM"
             // If overlap, reject
             // We do naive check: if start < existing end and end > existing start
@@ -75,3 +75,4 @@ if($method==='DELETE'){
     if(!$user) json_err('Forbidden',403);
     $id=$_GET['id']??''; $pdo->prepare("DELETE FROM sessions WHERE id=?")->execute([$id]); json_ok(['msg'=>'Deleted']);
 }
+

@@ -1,7 +1,7 @@
-<?php
-// api/auth.php — login, logout, register, member signup, forgot (demo), session check
+﻿<?php
+// api/auth.php â€” login, logout, register, member signup, forgot (demo), session check
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
@@ -50,7 +50,7 @@ if ($action === 'login') {
     $password = $input['password'] ?? '';
 
     if ($username === '' || $password === '') json_err('Please fill in all required fields.', 400);
-    if (login_check_lock($pdo, $username) >= 7) json_err('Account locked. Too many failed attempts — try again in 15 minutes.', 423);
+    if (login_check_lock($pdo, $username) >= 7) json_err('Account locked. Too many failed attempts â€” try again in 15 minutes.', 423);
 
     // 1) try users table
     $stmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1");
@@ -216,7 +216,7 @@ if ($action === 'member_signup') {
     if ($name===''||$username===''||$contact===''||$email===''||$password===''||$planId==='') json_err('Please fill in all required fields.', 400);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_err('Please enter a valid email address.', 400);
     if (strlen($password) < 6) json_err('Password must be at least 6 characters.', 400);
-    if (!preg_match('/^[a-zA-Z0-9._]{3,20}$/', $username)) json_err('Username must be 3–20 characters (letters, numbers, dots, underscores only).', 400);
+    if (!preg_match('/^[a-zA-Z0-9._]{3,20}$/', $username)) json_err('Username must be 3â€“20 characters (letters, numbers, dots, underscores only).', 400);
 
     // unique
     $stmt = $pdo->prepare("SELECT id FROM members WHERE LOWER(username)=LOWER(?) UNION SELECT id FROM users WHERE LOWER(username)=LOWER(?)");
@@ -248,7 +248,7 @@ if ($action === 'member_signup') {
     $pdo->prepare("INSERT INTO activity_log (id, action, category, detail, extra, by_name, by_username, by_role, at) VALUES (?,?,?,?,?,?,?,?,NOW())")
         ->execute([gen_uid('ACT'), 'Signup', 'Member', $name, 'ID: '.$id.' | Plan: '.$plan['name'].' | Awaiting front-desk payment', $name, $username, 'member']);
 
-    json_ok(['msg' => 'Member registered — pending payment', 'id' => $id]);
+    json_ok(['msg' => 'Member registered â€” pending payment', 'id' => $id]);
 }
 
 // ---- FORGOT PASSWORD (demo: verify username+contact/email) ----
@@ -318,3 +318,4 @@ if ($action === 'forgot_reset') {
 }
 
 json_err('Unknown auth action: ' . $action, 400);
+

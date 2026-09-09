@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -29,7 +29,7 @@ if ($method === 'POST') {
     $pdo->prepare("INSERT INTO walkins (id, name, contact, fee, date, time, recorded_by, recorded_by_username, notes) VALUES (?,?,?,?,?,?,?,?,?)")
         ->execute([$id,$name,$contact,$fee,$date,date('h:i A'),$user['name'],$user['username'], sanitize_text($input['notes']??'')]);
     $pdo->prepare("INSERT INTO activity_log (id, action, category, detail, extra, by_name, by_username, by_role, at) VALUES (?,?,?,?,?,?,?,?,NOW())")
-        ->execute([gen_uid('ACT'),'Walk-In','WalkIn',$name,'Fee: ₱'.$fee.' | Date: '.$date,$user['name'],$user['username'],$user['role']]);
+        ->execute([gen_uid('ACT'),'Walk-In','WalkIn',$name,'Fee: â‚±'.$fee.' | Date: '.$date,$user['name'],$user['username'],$user['role']]);
     json_ok(['id'=>$id]);
 }
 if ($method === 'DELETE') {
@@ -39,3 +39,4 @@ if ($method === 'DELETE') {
     $pdo->prepare("DELETE FROM walkins WHERE id=?")->execute([$id]);
     json_ok(['msg'=>'Deleted']);
 }
+

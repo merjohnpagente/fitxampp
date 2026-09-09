@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../includes/db.php';
 $pdo=getDB();
 $method=$_SERVER['REQUEST_METHOD'];
 
@@ -24,3 +24,4 @@ if($method==='POST'){
     }
     json_err('Unknown notifications action',400);
 }
+
