@@ -1,6 +1,7 @@
 ﻿<?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/../includes/db.php';
+ini_set('display_errors',0); ini_set('display_startup_errors',0);
+$__db=null; foreach (['/../includes/db.php','/../db.php','/../../includes/db.php','/../includes/db.php'] as $p){ if(file_exists(__DIR__.$p)){ require_once __DIR__.$p; $__db=true; break; } } if(!$__db){ header('Content-Type: application/json'); http_response_code(500); echo json_encode(['ok'=>false,'error'=>'Backend missing: includes/db.php not found at '. __DIR__ . '. Please copy latest GitHub files to htdocs (git pull)']); exit; }
 $pdo = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -39,4 +40,5 @@ if ($method === 'DELETE') {
     $pdo->prepare("DELETE FROM walkins WHERE id=?")->execute([$id]);
     json_ok(['msg'=>'Deleted']);
 }
+
 

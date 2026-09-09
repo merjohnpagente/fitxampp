@@ -2,7 +2,8 @@
 // ============================================================
 // FITCORE — PDO Database Connection
 // ============================================================
-require_once __DIR__ . '/config.php';
+ini_set('display_errors',0); ini_set('display_startup_errors',0);
+$__cfg=null; foreach (['/config.php','/../config.php','/../includes/config.php'] as $p){ if(file_exists(__DIR__.$p)){ require_once __DIR__.$p; $__cfg=true; break; } } if(!$__cfg){ header('Content-Type: application/json'); http_response_code(500); echo json_encode(['ok'=>false,'error'=>'Backend missing: includes/config.php not found. Please copy latest GitHub files to htdocs (git pull)']); exit; }
 
 function getDB() {
     static $pdo = null;
