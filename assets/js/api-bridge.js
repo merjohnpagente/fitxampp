@@ -20,15 +20,22 @@
 
   console.log('[FITCORE] PHP mode: using MySQL via api/*.php — checking connection...');
 
-  // Small helper
+  // Small helper — now handles <br /> HTML errors gracefully
   async function apiFetch(url, opts={}) {
     const res = await fetch(url, {
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       ...opts
     });
-    const data = await res.json().catch(()=>({ok:false,error:'Invalid JSON'}));
-    if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP '+res.status));
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) {
+      // Server returned HTML (e.g. <br /> warning) instead of JSON
+      const short = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g,' ').trim().slice(0,180);
+      throw new Error(short || ('HTTP '+res.status+' Invalid JSON'));
+    }
+    if (!res.ok || data.ok === false) throw new Error(data.error || data.details || ('HTTP '+res.status));
     return data;
   }
 

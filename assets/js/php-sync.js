@@ -219,8 +219,9 @@
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({username, password})
           });
-          const data = await res.json();
-          if (!data.ok) return {ok:false, error: data.error || 'Login failed'};
+          const text = await res.text();
+          let data; try{ data=JSON.parse(text); } catch(e){ const short=text.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180); return {ok:false, error: short || 'Server error (invalid JSON)'}; }
+          if (!data.ok) return {ok:false, error: data.error || data.details || 'Login failed'};
           Auth.setSession(data.user);
           return {ok:true, user: data.user};
         } catch(e) {
@@ -238,8 +239,9 @@
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({role, ...payload})
           });
-          const data = await res.json();
-          if (!data.ok) return {ok:false, error: data.error};
+          const text = await res.text();
+          let data; try{ data=JSON.parse(text); } catch(e){ const short=text.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180); return {ok:false, error: short || 'Server error'}; }
+          if (!data.ok) return {ok:false, error: data.error || data.details};
           // refresh users cache
           try {
             const u = await fetch('api/users.php', {credentials:'same-origin'}).then(r=>r.json());
@@ -284,8 +286,9 @@
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({...v, planId})
           });
-          const data = await res.json();
-          if(!data.ok){ if(err){err.textContent=data.error;err.style.display='block';} return; }
+          const text = await res.text();
+          let data; try{ data=JSON.parse(text); } catch(e){ const short=text.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,220); if(err){err.textContent='Server error: '+short; err.style.display='block';} console.error('member_signup HTML:', text); return; }
+          if(!data.ok){ if(err){err.textContent=data.error || data.details || 'Registration failed';err.style.display='block';} return; }
           // update cache
           const fresh = await fetch('api/members.php', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>null);
           if(fresh && fresh.members) window.PHP_CACHE.members = fresh.members;

@@ -16,13 +16,26 @@ function getDB() {
     ];
     try {
         $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        // Verify DB exists and has tables — if not, give friendly JSON
+        try {
+            $pdo->query("SELECT 1 FROM users LIMIT 1");
+        } catch (PDOException $e) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'ok' => false,
+                'error' => 'Database not initialized. Please import sql/database.sql in phpMyAdmin (DB: '.DB_NAME.')',
+                'details' => $e->getMessage()
+            ]);
+            exit;
+        }
     } catch (PDOException $e) {
         // Friendly error for XAMPP beginners
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode([
             'ok' => false,
-            'error' => 'Database connection failed. Did you import database.sql in phpMyAdmin and start MySQL?',
+            'error' => 'Database connection failed. Did you import sql/database.sql in phpMyAdmin and start MySQL?',
             'details' => $e->getMessage()
         ]);
         exit;
