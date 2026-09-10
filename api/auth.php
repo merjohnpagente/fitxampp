@@ -53,9 +53,9 @@ if ($action === 'login') {
     if ($username === '' || $password === '') json_err('Please fill in all required fields.', 400);
     if (login_check_lock($pdo, $username) >= 7) json_err('Account locked. Too many failed attempts â€” try again in 15 minutes.', 423);
 
-    // 1) try users table
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1");
-    $stmt->execute([$username]);
+    // 1) try users table — allow username OR email (user said "email ug password dli maka log in")
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(username)=LOWER(?) OR (email IS NOT NULL AND LOWER(email)=LOWER(?)) LIMIT 1");
+    $stmt->execute([$username, $username]);
     $user = $stmt->fetch();
     if ($user) {
         if ($user['status'] === 'locked') json_err('Account locked. Please contact the administrator.', 403);
@@ -67,6 +67,8 @@ if ($action === 'login') {
                 $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([$newHash, $user['id']]);
             }
             login_reset($pdo, $username);
+            if (!empty($user['username']) && strtolower($user['username']) !== strtolower($username)) login_reset($pdo, $user['username']);
+            if (!empty($user['email']) && strtolower($user['email']) !== strtolower($username)) login_reset($pdo, $user['email']);
             // Decode JSON fields
             $user['specializations'] = $user['specializations'] ? json_decode($user['specializations'], true) : [];
             $user['available_days'] = $user['available_days'] ? json_decode($user['available_days'], true) : [];
@@ -81,9 +83,9 @@ if ($action === 'login') {
         }
     }
 
-    // 2) try members table
-    $stmt = $pdo->prepare("SELECT * FROM members WHERE LOWER(username)=LOWER(?) LIMIT 1");
-    $stmt->execute([$username]);
+    // 2) try members table — allow username OR email
+    $stmt = $pdo->prepare("SELECT * FROM members WHERE LOWER(username)=LOWER(?) OR (email IS NOT NULL AND LOWER(email)=LOWER(?)) LIMIT 1");
+    $stmt->execute([$username, $username]);
     $member = $stmt->fetch();
     if ($member) {
         if ($member['status'] === 'Archived') json_err('Your account has been archived. Please contact the front desk.', 403);
@@ -96,6 +98,8 @@ if ($action === 'login') {
             $pdo->prepare("UPDATE members SET password_hash=? WHERE id=?")->execute([$newHash, $member['id']]);
         }
         login_reset($pdo, $username);
+        if (!empty($member['username']) && strtolower($member['username']) !== strtolower($username)) login_reset($pdo, $member['username']);
+        if (!empty($member['email']) && strtolower($member['email']) !== strtolower($username)) login_reset($pdo, $member['email']);
         $sess = [
             'id' => $member['id'],
             'email' => $member['email'] ?? '',
@@ -261,13 +265,13 @@ if ($action === 'forgot_verify') {
     $phone = sanitize_text($input['phone'] ?? '');
     if ($username==='') json_err('Please enter your username.', 400);
 
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1");
-    $stmt->execute([$username]);
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(username)=LOWER(?) OR (email IS NOT NULL AND LOWER(email)=LOWER(?)) LIMIT 1");
+    $stmt->execute([$username, $username]);
     $user = $stmt->fetch();
     $type = 'user';
     if (!$user) {
-        $stmt = $pdo->prepare("SELECT * FROM members WHERE LOWER(username)=LOWER(?) LIMIT 1");
-        $stmt->execute([$username]);
+        $stmt = $pdo->prepare("SELECT * FROM members WHERE LOWER(username)=LOWER(?) OR (email IS NOT NULL AND LOWER(email)=LOWER(?)) LIMIT 1");
+        $stmt->execute([$username, $username]);
         $user = $stmt->fetch();
         $type = 'member';
     }

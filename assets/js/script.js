@@ -211,7 +211,8 @@ class AuthService{
   async login(username,password){
     if(!username||!password)return{ok:false,error:'Please fill in all required fields.'};
     if(LoginAttempts.get(username)>=LOGIN_MAX_ATTEMPTS)return{ok:false,error:'Account locked. Too many failed attempts — try again in 15 minutes.'};
-    const found=Users.all().find(x=>x.username&&x.username.toLowerCase()===username.toLowerCase());
+    const lower=String(username).toLowerCase().trim();
+    const found=Users.all().find(x=> (x.username&&x.username.toLowerCase()===lower) || (x.email&&String(x.email).toLowerCase()===lower) );
     if(found){
       if(found.status==='locked')return{ok:false,error:'Account locked. Please contact the administrator.'};
       if(found.status==='pending')return{ok:false,error:'Your account is pending admin approval. Please wait.'};
@@ -225,13 +226,15 @@ class AuthService{
           const arr=Users.all(); const idx=arr.findIndex(x=>x.id===found.id); if(idx>-1){arr[idx]=found; Users.save(arr);}
         }
         LoginAttempts.reset(username);
+        if(found.username && found.username.toLowerCase()!==lower) LoginAttempts.reset(found.username);
+        if(found.email && String(found.email).toLowerCase()!==lower) LoginAttempts.reset(found.email);
         this.setSession(found);
         return{ok:true,user:found};
       }
       LoginAttempts.register(username);
       return{ok:false,error:'Invalid username or password.'};
     }
-    const member=Members.all().find(m=>m.username&&m.username.toLowerCase()===username.toLowerCase());
+    const member=Members.all().find(m=> (m.username&&m.username.toLowerCase()===lower) || (m.email&&String(m.email).toLowerCase()===lower) );
     if(member){
       if(member.status==='Archived')return{ok:false,error:'Your account has been archived. Please contact the front desk.'};
       let valid=false;
@@ -245,6 +248,8 @@ class AuthService{
           const arr=Members.all(); const idx=arr.findIndex(x=>x.id===member.id); if(idx>-1 && arr[idx].password) { delete arr[idx].password; Members.save(arr); }
         }
         LoginAttempts.reset(username);
+        if(member.username && member.username.toLowerCase()!==lower) LoginAttempts.reset(member.username);
+        if(member.email && String(member.email).toLowerCase()!==lower) LoginAttempts.reset(member.email);
         const sess={id:member.id,email:member.email||'',username:member.username,name:member.name,contact:member.contact,role:'member',memberId:member.id,status:member.status};
         this.setSession(sess);
         return{ok:true,user:sess};
@@ -610,7 +615,9 @@ async function doLogin(){
     loadApp();
   }catch(e){
     console.error('[login]',e);
-    showLoginError('Login failed. Please refresh the page (Ctrl+F5) and try again.');
+    const msg = (e && e.message) ? e.message : 'Login failed. Please refresh the page (Ctrl+F5) and try again.';
+    // Show real error unless it's too generic/technical HTML
+    showLoginError(msg.includes('Invalid JSON') ? 'Server error — check XAMPP MySQL & import sql/database.sql (see check.php)' : msg);
   }finally{
     if(btn){btn.disabled=false;btn.textContent='Log In';}
   }
