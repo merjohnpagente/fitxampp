@@ -4998,7 +4998,7 @@ function refreshWalkinTable(){
   const perPage=10;const total=data.length;const pages=Math.ceil(total/perPage)||1;
   const slice=data.slice((walkinPage-1)*perPage,walkinPage*perPage);
   const rows=slice.length?slice.map((w, idx)=>{
-    const displayId = `WALKIN${String(data.length - idx).padStart(1,'')}`; // WALKIN1, WALKIN2... or use WI-0001 style
+    const displayId = `WALKIN${String(data.length - idx).padStart(1,'')}`;
     const vName = w.visitorName || w.name || '';
     return `<tr>
     <td>${esc(displayId)}<br><span style="font-size:10px;color:var(--gray-500)">${esc(w.id)}</span></td>
@@ -5006,9 +5006,10 @@ function refreshWalkinTable(){
     <td>${formatDate(w.date)}</td>
     <td>${esc(w.time)}</td>
     <td style="color:var(--green);font-weight:600">₱${Number(w.fee).toLocaleString()}</td>
-    <td>${esc(w.recordedBy||'—')}</td>
+    <td>${esc(w.recordedBy||w.recorded_by||'—')}</td>
     <td><div class="td-actions"><button class="btn-icon" title="View Receipt" onclick="viewWalkinReceipt('${w.id}')">🧾</button></div></td>
-  </tr>`).join(''):`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🚶</div><p>No walk-in records found</p></div></td></tr>`;
+  </tr>`;
+  }).join(''):`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🚶</div><p>No walk-in records found</p></div></td></tr>`;
   let pag='';if(pages>1){pag=`<div class="pagination"><button class="page-btn" onclick="walkinPage=${walkinPage-1};refreshWalkinTable()" ${walkinPage===1?'disabled':''}>‹</button>${Array.from({length:pages},(_,i)=>`<button class="page-btn ${i+1===walkinPage?'active':''}" onclick="walkinPage=${i+1};refreshWalkinTable()">${i+1}</button>`).join('')}<button class="page-btn" onclick="walkinPage=${walkinPage+1};refreshWalkinTable()" ${walkinPage===pages?'disabled':''}>›</button><span class="page-info">${total} records</span></div>`;}
   document.getElementById('walkinTableCard').innerHTML=`
     <div class="table-header"><h3>Walk-In Records <span style="font-size:12px;font-weight:400;color:var(--gray-500);margin-left:6px">${total} record${total!==1?'s':''}</span></h3></div>
