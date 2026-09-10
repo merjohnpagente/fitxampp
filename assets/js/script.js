@@ -1473,23 +1473,52 @@ function initScrollRefresh(){
   });
 }
 function loadApp(){
+  // FIX: don't validate against cache if PHP cache not ready yet — prevents instant logout loop (mo balik sa login)
+  const phpReady = !(window.USE_PHP && !window.PHP_READY);
   if(currentUser&&currentUser.role==='member'){
-    const live=Members.one(currentUser.memberId||currentUser.id);
+    let live=Members.one(currentUser.memberId||currentUser.id);
+    // if pending from session but live not in cache yet (PHP cache still loading), trust session status
+    const sessStatus = (currentUser.status||'').toLowerCase();
+    const isPendingSess = sessStatus==='pending_payment' || sessStatus==='archived';
+    if(!live && isPendingSess && window.USE_PHP && !window.PHP_READY){
+      // cache not ready but session says pending — show gate with session data
+      showPendingGate({id:currentUser.memberId||currentUser.id, name:currentUser.name, planId:currentUser.plan_id||'', status:currentUser.status, ...currentUser});
+      return;
+    }
     if(live)currentUser={...currentUser,name:live.name,email:live.email,contact:live.contact,status:live.status};
     if(live&&(live.status==='pending_payment'||live.status==='Archived')){
       showPendingGate(live);
+      return;
+    }
+    if(isPendingSess && !live){
+      // fallback: session says pending but cache miss — still show gate
+      showPendingGate({id:currentUser.memberId||currentUser.id, name:currentUser.name, planId:currentUser.plan_id||'', status:currentUser.status, ...currentUser});
       return;
     }
   }
   if(currentUser&&currentUser.role!=='member'){
     // Re-validate staff/trainer/admin sessions against the Users table so demoted,
     // locked or deleted accounts lose access immediately on the next load.
-    const live=Users.one(currentUser.id);
-    if(!live||live.status==='locked'||live.status==='pending'){
-      doLogout();
-      return;
+    // SKIP if PHP cache not ready — otherwise Users.one() is null and we would doLogout() instantly (loop bug)
+    if(!phpReady){
+      // wait for cache, don't logout yet
+    } else {
+      const live=Users.one(currentUser.id);
+      if(!live||live.status==='locked'||live.status==='pending'){
+        // double-check via PHP session before logging out — maybe cache stale
+        if(window.USE_PHP && live===null){
+          // don't logout on cache miss, let php-sync session check handle it
+        } else {
+          // show clear error before logout for pending/locked staff
+          if(live&&live.status==='pending') showLoginError('Your account is pending admin approval. Please wait.');
+          if(live&&live.status==='locked') showLoginError('Account locked. Please contact admin.');
+          doLogout();
+          return;
+        }
+      } else {
+        currentUser={...currentUser,...live};
+      }
     }
-    currentUser={...currentUser,...live};
   }
   document.getElementById('loginPage').style.display='none';
   document.getElementById('landingNav').style.display='none';
