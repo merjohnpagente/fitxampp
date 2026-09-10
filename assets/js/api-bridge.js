@@ -64,6 +64,10 @@
     // member aliases
     if(out.plan_name && !out.planName) out.planName=out.plan_name;
     if(out.plan_price && !out.planPrice) out.planPrice=out.plan_price;
+    // walk-in aliases: DB has `name` but JS expects `visitorName`
+    if(out.name && !out.visitorName && out.fee !== undefined) out.visitorName=out.name;
+    if(out.visitorName && !out.name) out.name=out.visitorName;
+    if(out.recorded_by && !out.recordedBy) out.recordedBy=out.recorded_by;
     // keep both
     return out;
   }

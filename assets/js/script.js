@@ -4983,7 +4983,7 @@ function renderWalkin(){
 }
 function refreshWalkinTable(){
   let data=Walkins.all();
-  if(walkinSearch){const s=walkinSearch.toLowerCase();data=data.filter(w=>w.visitorName.toLowerCase().includes(s));}
+  if(walkinSearch){const s=walkinSearch.toLowerCase();data=data.filter(w=>String(w.visitorName||w.name||'').toLowerCase().includes(s));}
   // Stats
   const today_=today();
   const todayCount=Walkins.all().filter(w=>w.date===today_).length;
@@ -4997,9 +4997,12 @@ function refreshWalkinTable(){
   data=data.slice().reverse();
   const perPage=10;const total=data.length;const pages=Math.ceil(total/perPage)||1;
   const slice=data.slice((walkinPage-1)*perPage,walkinPage*perPage);
-  const rows=slice.length?slice.map(w=>`<tr>
-    <td>${esc(w.id)}</td>
-    <td>${esc(w.visitorName)}</td>
+  const rows=slice.length?slice.map((w, idx)=>{
+    const displayId = `WALKIN${String(data.length - idx).padStart(1,'')}`; // WALKIN1, WALKIN2... or use WI-0001 style
+    const vName = w.visitorName || w.name || '';
+    return `<tr>
+    <td>${esc(displayId)}<br><span style="font-size:10px;color:var(--gray-500)">${esc(w.id)}</span></td>
+    <td>${esc(vName)}</td>
     <td>${formatDate(w.date)}</td>
     <td>${esc(w.time)}</td>
     <td style="color:var(--green);font-weight:600">₱${Number(w.fee).toLocaleString()}</td>
