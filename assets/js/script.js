@@ -4034,7 +4034,8 @@ function dismissAllRenewals(){
 function confirmRenew(memberId){
   const m=Members.one(memberId);
   if(!m)return;
-  const pl=m.planId?Plans.one(m.planId):null;
+  const pid = m.planId || m.plan_id || '';
+  const pl=pid? (Plans.one(pid) || Plans.all().find(p=>String(p.id).trim().toLowerCase()===String(pid).trim().toLowerCase())) :null;
   const price=pl?Number(pl.price):0;
   openConfirm('🔄 Renew Membership',
     `Renew <strong>${esc(m.name)}</strong>'s <strong>${esc(pl?pl.name:'—')}</strong> plan for <strong>₱${price.toLocaleString()}</strong>?<br><span style="font-size:12px;color:var(--gray-500)">You'll confirm the payment details next.</span>`,
@@ -4043,23 +4044,24 @@ function confirmRenew(memberId){
 }
 function renderNotifications(){
   const el=document.getElementById('panelNotifications');
+  const getExpiry = (m)=> m.expiryDate || m.expiry_date || '';
   const allExpiring=Members.all().filter(m=>{
     if(m.status==='Archived')return false;
-    const d=daysUntil(m.expiryDate);
-    return d<=7;
+    const d=daysUntil(getExpiry(m));
+    return !isNaN(d) && d<=7;
   });
   const members=allExpiring.filter(m=>!_dismissedIds.has(m.id));
   const plans=Plans.all();
-  const bucketOf=m=>{const d=daysUntil(m.expiryDate);return d<0?'expired':(d<=2?'urgent':'upcoming');};
+  const bucketOf=m=>{const d=daysUntil(getExpiry(m));return d<0?'expired':(d<=2?'urgent':'upcoming');};
   const buckets={expired:[],urgent:[],upcoming:[]};
   members.forEach(m=>buckets[bucketOf(m)].push(m));
-  ['expired','urgent','upcoming'].forEach(k=>buckets[k].sort((a,b)=>daysUntil(a.expiryDate)-daysUntil(b.expiryDate)));
+  ['expired','urgent','upcoming'].forEach(k=>buckets[k].sort((a,b)=>daysUntil(getExpiry(a))-daysUntil(getExpiry(b))));
   const visible=_notifFilter==='All'?[...buckets.expired,...buckets.urgent,...buckets.upcoming]:(buckets[_notifFilter]||[]);
   const now=new Date();
   const monthPays=Payments.all().filter(p=>{const d=new Date(p.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
   const monthRev=monthPays.reduce((a,p)=>a+Number(p.amount),0);
   const items=visible.map(m=>{
-    const d=daysUntil(m.expiryDate);const pl=plans.find(p=>p.id===m.planId);
+    const d=daysUntil(m.expiryDate || m.expiry_date || '');const pid=m.planId||m.plan_id||''; const pl=plans.find(p=>String(p.id).trim().toLowerCase()===String(pid).trim().toLowerCase()) || (m.planName?{name:m.planName}:m.plan_name?{name:m.plan_name}:null);
     const bucket=bucketOf(m);
     const avatarColor=bucket==='expired'?'#991b1b':bucket==='urgent'?'var(--orange)':'var(--gold)';
     const dayLabel=bucket==='expired'?`Expired ${Math.abs(d)} day${Math.abs(d)!==1?'s':''} ago`:`${d} day${d!==1?'s':''} left`;
@@ -4073,7 +4075,7 @@ function renderNotifications(){
           <span class="notif-name">${esc(m.name)}</span>
           <span class="badge ${badgeCls}" style="font-size:8px">${esc(pl?pl.name:'—')}</span>
         </div>
-        <div style="font-size:11px;color:var(--gray-500);margin-top:2px">Expires ${formatDate(m.expiryDate)} <span style="color:${dayColor};font-weight:700">· ${dayLabel}</span></div>
+        <div style="font-size:11px;color:var(--gray-500);margin-top:2px">Expires ${formatDate(m.expiryDate||m.expiry_date||'')} <span style="color:${dayColor};font-weight:700">· ${dayLabel}</span></div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <button class="btn-primary btn-sm" onclick="confirmRenew('${m.id}')" style="font-size:11px;padding:7px 14px;width:auto">Renew →</button>
