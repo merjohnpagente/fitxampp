@@ -5154,15 +5154,42 @@ function saveWalkin(){
   const err=document.getElementById('walkinError');
   err.style.display='none';
   if(!name){err.textContent="Please enter the visitor's full name to proceed.";err.style.display='block';return;}
+  // admin/staff only — ensure PHP session can save to MySQL
+  if(!currentUser || !['admin','staff'].includes(currentUser.role)){
+    err.textContent='Only admin or staff can record walk-ins.';err.style.display='block';return;
+  }
   const walkins=Walkins.all();
   const now=new Date();
   const time=now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-  const newId='WI-'+String(walkins.length+1).padStart(4,'0');
   const fee=getWalkinFee();
-  walkins.push({id:newId,visitorName:sanitizeText(name),date:today(),time,fee,recordedBy:currentUser.username,createdAt:today()});
-  Walkins.save(walkins);
+  // use temp id, let server generate WKI- id when USE_PHP
+  const newId='WI-'+String(walkins.length+1).padStart(4,'0');
+  const contactEl=document.getElementById('walkinContact');
+  const contact=contactEl?contactEl.value.trim():'';
+  const notesEl=document.getElementById('walkinNotes');
+  const notes=notesEl?notesEl.value.trim():'';
+  const newRow={id:newId,visitorName:sanitizeText(name),name:sanitizeText(name),contact:sanitizeText(contact),date:today(),time,fee,recordedBy:currentUser.username,recorded_by:currentUser.username,createdAt:today(),notes};
+  // If PHP mode, let php-sync handle the POST and server ID sync; we just add to cache
+  if(window.USE_PHP && window.PHP_READY){
+    Walkins.add(newRow);
+    // also fire direct POST as fallback in case php-sync add is fire-and-forget and fails silently
+    fetch('api/walkins.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:sanitizeText(name),contact:sanitizeText(contact),fee,date:today(),notes})})
+      .then(r=>r.json().then(d=>{if(!r.ok) throw new Error(d.error||'Failed'); return d;}))
+      .then(d=>{
+        // refresh cache from DB so walk-in survives refresh
+        return fetch('api/walkins.php',{credentials:'same-origin'}).then(r=>r.json()).then(j=>{
+          if(j.walkins){ window.PHP_CACHE.walkins=j.walkins.map(w=>{ const out={...w}; if(w.name&&!out.visitorName) out.visitorName=w.name; return out; }); Walkins.save(window.PHP_CACHE.walkins); }
+        });
+      })
+      .catch(e=>{ console.warn('Walk-in PHP save failed',e); toast(e.message||'Walk-in save failed — check phpMyAdmin','error'); });
+  } else {
+    walkins.push(newRow);
+    Walkins.save(walkins);
+  }
   toast(`Walk-in recorded for ${name}. Fee: ₱${fee.toLocaleString()}.00`);
   closeModal('walkinModal');renderWalkin();
+  // update dashboard revenue immediately
+  if(typeof renderDashboard==='function') try{ renderDashboard(); }catch(e){}
 }
 function deleteWalkin(id){
   openConfirm('Delete Walk-In','Are you sure you want to delete this walk-in record?',()=>{
