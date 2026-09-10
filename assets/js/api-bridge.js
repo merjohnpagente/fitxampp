@@ -69,13 +69,14 @@
   }
   async function loadAll() {
     try {
-      const [membersRaw, plans, paymentsRaw, usersRaw, attendance, walkins, notifications, messages, announcements] = await Promise.all([
+      const [membersRaw, plans, paymentsRaw, usersRaw, attendance, walkins, sessionsRaw, notifications, messages, announcements] = await Promise.all([
         apiFetch('api/members.php').then(d=>d.members||[]).catch(()=>[]),
         apiFetch('api/plans.php').then(d=>d.plans||[]).catch(()=>[]),
         apiFetch('api/payments.php').then(d=>d.payments||[]).catch(()=>[]),
         apiFetch('api/users.php').then(d=>d.users||[]).catch(()=>[]),
         apiFetch('api/attendance.php').then(d=>d.attendance||[]).catch(()=>[]),
         apiFetch('api/walkins.php').then(d=>d.walkins||[]).catch(()=>[]),
+        apiFetch('api/sessions.php').then(d=>d.sessions||[]).catch(()=>[]),
         apiFetch('api/notifications.php?status=open').then(d=>d.notifications||[]).catch(()=>[]),
         apiFetch('api/messages.php').then(d=>d.messages||[]).catch(()=>[]),
         apiFetch('api/announcements.php').then(d=>d.announcements||[]).catch(()=>[])
@@ -85,13 +86,14 @@
       const users = usersRaw.map(normalizeRow);
       const attendanceNorm = (attendance||[]).map(normalizeRow);
       const walkinsNorm = (walkins||[]).map(normalizeRow);
-      const sessionsRaw = []; // sessions not yet fetched separately, will be via separate call if needed
+      const sessionsNorm = (sessionsRaw||[]).map(normalizeRow);
       PHP_CACHE.members = members;
       PHP_CACHE.plans = plans;
       PHP_CACHE.payments = payments;
       PHP_CACHE.users = users;
       PHP_CACHE.attendance = attendanceNorm;
       PHP_CACHE.walkins = walkinsNorm;
+      PHP_CACHE.sessions = sessionsNorm;
       PHP_CACHE.notifications = notifications;
       PHP_CACHE.messages = messages;
       PHP_CACHE.announcements = announcements;
