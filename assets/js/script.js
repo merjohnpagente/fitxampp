@@ -3073,15 +3073,22 @@ function refreshHistoryTable(){
   const attendance=Attendance.all();
   const sessions=Sessions.all();
   const plans=Plans.all();
-  let rows=Members.all().filter(m=>m.status!=='pending_payment'||payments.some(p=>p.memberId===m.id)).filter(m=>memberHistoryTab==='All'||m.status===memberHistoryTab).map(m=>{
-    const mp=payments.filter(p=>p.memberId===m.id);
-    const ma=attendance.filter(a=>a.memberId===m.id);
-    const ms=sessions.filter(s=>s.memberId===m.id);
-    const pl=plans.find(p=>p.id===m.planId);
-    const first=[...mp.map(p=>p.date),m.startDate].filter(Boolean).sort()[0]||m.createdAt||'';
-    const last=[...mp.map(p=>p.date),...ma.map(a=>a.date),m.expiryDate].filter(Boolean).sort().slice(-1)[0]||'';
+  const getMid = (o)=> String(o.memberId||o.member_id||'');
+  const getPid = (o)=> String(o.planId||o.plan_id||'').trim().toLowerCase();
+  let rows=Members.all().filter(m=>m.status!=='pending_payment'||payments.some(p=>getMid(p)===String(m.id))).filter(m=>memberHistoryTab==='All'||m.status===memberHistoryTab).map(m=>{
+    const mp=payments.filter(p=>getMid(p)===String(m.id));
+    const ma=attendance.filter(a=>getMid(a)===String(m.id));
+    const ms=sessions.filter(s=>getMid(s)===String(m.id));
+    const pid = getPid(m);
+    const pl=plans.find(p=>String(p.id).trim().toLowerCase()===pid) || null;
+    const planName = pl ? pl.name : (m.planName || m.plan_name || '—');
+    const startVal = m.startDate || m.start_date || '';
+    const expiryVal = m.expiryDate || m.expiry_date || '';
+    const createdVal = m.createdAt || m.created_at || '';
+    const first=[...mp.map(p=>p.date),startVal].filter(Boolean).sort()[0]||createdVal||'';
+    const last=[...mp.map(p=>p.date),...ma.map(a=>a.date||a.check_in||''),expiryVal].filter(Boolean).sort().slice(-1)[0]||'';
     const totalPaid=mp.reduce((s,p)=>s+Number(p.amount||0),0);
-    return{id:m.id,name:m.name,plan:pl?pl.name:'—',totalPaid,payCount:mp.length,attCount:ma.length,sessCount:ms.length,first,last,status:m.status};
+    return{id:m.id,name:m.name,plan:planName,totalPaid,payCount:mp.length,attCount:ma.length,sessCount:ms.length,first,last,status:m.status,avatar:m.avatar||''};
   });
   if(historySearch){const s=historySearch.toLowerCase();rows=rows.filter(r=>r.name.toLowerCase().includes(s)||r.id.toLowerCase().includes(s));}
   rows=rows.sort((a,b)=>String(b.last).localeCompare(String(a.last)));

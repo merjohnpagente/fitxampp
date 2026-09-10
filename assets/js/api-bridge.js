@@ -83,12 +83,15 @@
       const members = membersRaw.map(normalizeRow);
       const payments = paymentsRaw.map(normalizeRow);
       const users = usersRaw.map(normalizeRow);
+      const attendanceNorm = (attendance||[]).map(normalizeRow);
+      const walkinsNorm = (walkins||[]).map(normalizeRow);
+      const sessionsRaw = []; // sessions not yet fetched separately, will be via separate call if needed
       PHP_CACHE.members = members;
       PHP_CACHE.plans = plans;
       PHP_CACHE.payments = payments;
       PHP_CACHE.users = users;
-      PHP_CACHE.attendance = attendance;
-      PHP_CACHE.walkins = walkins;
+      PHP_CACHE.attendance = attendanceNorm;
+      PHP_CACHE.walkins = walkinsNorm;
       PHP_CACHE.notifications = notifications;
       PHP_CACHE.messages = messages;
       PHP_CACHE.announcements = announcements;
