@@ -4386,8 +4386,22 @@ function importMessages(){
 // PANEL: ANNOUNCEMENTS (gym closures, events, anniversaries)
 // ======================================================================
 const ANNOUNCE_META={general:{icon:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l3 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8a5 5 0 0 1 0 8"/><path d="M17.5 5.5a9 9 0 0 1 0 13"/></svg>`,label:'General',cls:'badge-active'},event:{icon:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,label:'Event',cls:'badge-expiring'},holiday:{icon:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,label:'Holiday / Closed',cls:'badge-expired'},alert:{icon:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,label:'Alert',cls:'badge-suspended'}};
+function dedupeAnnouncements(){
+  const all=Announcements.all();
+  const seen=new Set();
+  let changed=false;
+  const filtered=all.filter(a=>{
+    const key=`${a.title}|${a.text}|${a.type}|${a.date}`;
+    if(seen.has(key)){ changed=true; return false; }
+    seen.add(key);
+    return true;
+  });
+  if(changed){ Announcements.save(filtered); return filtered; }
+  return all;
+}
 function renderAnnouncements(){
   const el=document.getElementById('panelAnnouncements');
+  dedupeAnnouncements();
   const all=Announcements.all().slice().reverse();
   el.innerHTML=`
   <div class="page-actions">
@@ -4425,16 +4439,34 @@ function openAnnounceModal(){
   if(err){err.textContent='';err.style.display='none';}
   openModal('announceModal');
 }
+let _announceSaving=false;
 function saveAnnouncement(){
+  if(_announceSaving) return;
   const err=document.getElementById('announceFormError');
   const title=document.getElementById('an_title').value.trim();
   const text=document.getElementById('an_text').value.trim();
   if(!title||!text){err.textContent='Please fill in the title and message.';err.style.display='block';return;}
-  Announcements.add({id:nextId(KEY.announcements,'ANN'),type:document.getElementById('an_type').value,date:document.getElementById('an_date').value,title:sanitizeText(title),text:sanitizeText(text),createdBy:currentUser.name||'Admin',createdAt:today(),time:new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})});
-  logActivity('Posted','Announcement','"'+title+'"');
-  closeModal('announceModal');
-  renderAnnouncements();
-  toast('Announcement posted. Members can see it now.');
+  // prevent double (bakit nag double) — check duplicate within 2 sec or same title+text exists
+  const all=Announcements.all();
+  const dup=all.find(a=>a.title===sanitizeText(title) && a.text===sanitizeText(text) && a.type===document.getElementById('an_type').value);
+  if(dup){
+    const dupTime=new Date(dup.createdAt).getTime()||0;
+    if(Date.now()-dupTime < 5000){
+      err.textContent='Duplicate announcement — already posted just now.';err.style.display='block';toast('Duplicate blocked — announcement already exists','error');return;
+    }
+  }
+  _announceSaving=true;
+  const btn=document.querySelector('#announceModal .btn-primary');
+  if(btn){btn.disabled=true; btn.textContent='Posting…';}
+  try{
+    Announcements.add({id:nextId(KEY.announcements,'ANN'),type:document.getElementById('an_type').value,date:document.getElementById('an_date').value,title:sanitizeText(title),text:sanitizeText(text),createdBy:currentUser.name||'Admin',createdAt:today(),time:new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})});
+    logActivity('Posted','Announcement','"'+title+'"');
+    closeModal('announceModal');
+    renderAnnouncements();
+    toast('Announcement posted. Members can see it now.');
+  }finally{
+    setTimeout(()=>{ _announceSaving=false; if(btn){btn.disabled=false; btn.textContent='Post Announcement';}},800);
+  }
 }
 function deleteAnnouncement(id){
   const a=Announcements.one(id);
