@@ -4577,11 +4577,34 @@ function deleteSelectedPending(){
     'btn-danger'
   );
 }
-function openConfirmPayment(memberId){
+async function openConfirmPayment(memberId){
   _confirmPaymentMemberId=memberId;
   const m=Members.one(memberId);
   if(!m)return;
-  const plan=m.planId?Plans.one(m.planId):null;
+  // FIX: wait for PHP cache if not ready — prevents PLAN — / ₱0 bug (image)
+  if(window.USE_PHP && !window.PHP_READY && window.PHP_READY_PROMISE){
+    try{ await window.PHP_READY_PROMISE; }catch(e){}
+  }
+  let plan=m.planId?Plans.one(m.planId):null;
+  // fallback: check PHP_CACHE directly
+  if(!plan && window.PHP_CACHE && window.PHP_CACHE.plans){
+    plan = window.PHP_CACHE.plans.find(p=>p.id===m.planId) || null;
+  }
+  // fallback: fetch live from API if still missing
+  if(!plan && window.USE_PHP && m.planId){
+    try{
+      const r=await fetch('api/plans.php',{credentials:'same-origin'});
+      const d=await r.json();
+      if(d.plans) plan=d.plans.find(p=>p.id===m.planId)||null;
+    }catch(e){}
+  }
+  // fallback selector if plan still not found (e.g. plan deleted or pending without plan)
+  let planSelectorHtml='';
+  if(!plan){
+    const allPlans = (window.PHP_CACHE && window.PHP_CACHE.plans && window.PHP_CACHE.plans.length) ? window.PHP_CACHE.plans : Plans.all();
+    const opts = allPlans.filter(p=>p.status==='Active' || !p.status).map(p=>`<option value="${p.id}" ${p.id===m.planId?'selected':''}>${esc(p.name)} - ₱${Number(p.price).toLocaleString()} (${p.duration}mo)</option>`).join('');
+    planSelectorHtml = `<div style="margin-top:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">⚠ Plan not found — please select</div><select id="cpm_planSelect" style="width:100%;padding:9px 10px;background:var(--navy-700);border:1.5px solid var(--navy-600);border-radius:8px;color:var(--white);outline:none" onchange="onCpmPlanChange()"><option value="">Select plan</option>${opts}</select></div>`;
+  }
   document.getElementById('cpm_memberId').value=memberId;
   document.getElementById('confirmPaymentError').style.display='none';
   document.getElementById('cpm_summary').innerHTML=`
@@ -4593,16 +4616,32 @@ function openConfirmPayment(memberId){
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">
-      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">Plan</div><div style="font-weight:700;color:var(--white);margin-top:2px">${esc(plan?plan.name:'—')}</div></div>
-      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">Plan Price</div><div style="font-weight:700;color:var(--green);margin-top:2px">₱${plan?Number(plan.price).toLocaleString():'0'}</div></div>
-      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">Duration</div><div style="font-weight:700;color:var(--white);margin-top:2px">${plan?plan.duration+' month(s)':'-'}</div></div>
-      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">New Expiry</div><div style="font-weight:700;color:var(--white);margin-top:2px">${plan?formatDate(addMonths(today(),plan.duration)):'—'}</div></div>
-    </div>`;
+      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">Plan</div><div id="cpm_planName" style="font-weight:700;color:var(--white);margin-top:2px">${esc(plan?plan.name:'—')}</div></div>
+      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">Plan Price</div><div id="cpm_planPrice" style="font-weight:700;color:var(--green);margin-top:2px">₱${plan?Number(plan.price).toLocaleString():'0'}</div></div>
+      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">Duration</div><div id="cpm_planDuration" style="font-weight:700;color:var(--white);margin-top:2px">${plan?plan.duration+' month(s)':'-'}</div></div>
+      <div style="background:var(--navy-700);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px">New Expiry</div><div id="cpm_planExpiry" style="font-weight:700;color:var(--white);margin-top:2px">${plan?formatDate(addMonths(today(),plan.duration)):'—'}</div></div>
+    </div>${planSelectorHtml}`;
   document.getElementById('cpm_amount').value=plan?plan.price:'';
   document.getElementById('cpm_method').value='';
   document.getElementById('cpm_reference').value='';
   toggleCpmReference();
   openModal('confirmPaymentModal');
+}
+function onCpmPlanChange(){
+  const sel=document.getElementById('cpm_planSelect');
+  if(!sel) return;
+  const pid=sel.value;
+  const plan = pid ? (Plans.one(pid) || (window.PHP_CACHE&&window.PHP_CACHE.plans?window.PHP_CACHE.plans.find(p=>p.id===pid):null)) : null;
+  const nameEl=document.getElementById('cpm_planName');
+  const priceEl=document.getElementById('cpm_planPrice');
+  const durEl=document.getElementById('cpm_planDuration');
+  const expEl=document.getElementById('cpm_planExpiry');
+  const amt=document.getElementById('cpm_amount');
+  if(nameEl) nameEl.textContent=plan?plan.name:'—';
+  if(priceEl) priceEl.textContent=plan? '₱'+Number(plan.price).toLocaleString() : '₱0';
+  if(durEl) durEl.textContent=plan? plan.duration+' month(s)' : '-';
+  if(expEl) expEl.textContent=plan? formatDate(addMonths(today(),plan.duration)) : '—';
+  if(amt) amt.value=plan?plan.price:'';
 }
 function toggleCpmReference(){
   const method=document.getElementById('cpm_method').value;
@@ -4612,7 +4651,16 @@ function toggleCpmReference(){
 async function applyPaymentConfirmation(memberId,amount,method,reference){
   const member=Members.one(memberId);
   if(!member)return null;
-  const plan=member.planId?Plans.one(member.planId):null;
+  // if staff selected a plan via fallback selector, update member planId before computing
+  const selPlanEl=document.getElementById('cpm_planSelect');
+  let effectivePlanId = member.planId;
+  if(selPlanEl && selPlanEl.value) effectivePlanId = selPlanEl.value;
+  // also check fallback cache/API if still null
+  let plan=effectivePlanId?Plans.one(effectivePlanId):null;
+  if(!plan && window.PHP_CACHE && window.PHP_CACHE.plans) plan=window.PHP_CACHE.plans.find(p=>p.id===effectivePlanId)||null;
+  if(!plan && effectivePlanId && window.USE_PHP){
+    try{ const r=await fetch('api/plans.php',{credentials:'same-origin'}); const d=await r.json(); if(d.plans) plan=d.plans.find(p=>p.id===effectivePlanId)||null; }catch(e){}
+  }
   const start=today();
   const newExpiry=addMonths(start,plan?plan.duration:1);
   const now=new Date();
@@ -4622,14 +4670,16 @@ async function applyPaymentConfirmation(memberId,amount,method,reference){
     while(cloudPays[newId]) newId='PAY-'+String(parseInt(newId.split('-')[1],10)+1).padStart(4,'0');
   }catch(e){}
   const payments=Payments.all();
-  payments.push({id:newId,memberId,memberName:member.name,planId:member.planId,planName:plan?plan.name:'Unknown',amount:amount|| (plan?Number(plan.price):0),date:start,newExpiry,method:method||'Cash',reference:reference||'',notes:'',recordedBy:currentUser.name,recordedByUsername:currentUser.username,staffId:currentUser.id,status:'Paid',source:'activation',timestamp:now.getTime(),createdAt:start});
+  payments.push({id:newId,memberId,memberName:member.name,planId:effectivePlanId,planName:plan?plan.name:'Unknown',amount:amount|| (plan?Number(plan.price):0),date:start,newExpiry,method:method||'Cash',reference:reference||'',notes:'',recordedBy:currentUser.name,recordedByUsername:currentUser.username,staffId:currentUser.id,status:'Paid',source:'activation',timestamp:now.getTime(),createdAt:start});
   Payments.save(payments);
   // Atomic single update — avoids double pushCollection race and lost QR nonce
   const nonce=newQrNonce(memberId);
   // need nonce persisted first so qrTokenFor reads correct nonce; compute token directly
   const token=qrSig(memberId,start,nonce,getQrSecret()).slice? 'FCG.'+memberId+'.'+start.replace(/-/g,'')+'.'+qrSig(memberId,start,nonce,getQrSecret()).slice(0,16) : qrTokenFor(memberId,start);
-  // Use single atomic update for all activation fields
-  Members.update(memberId,{status:'Active',planStart:start,startDate:start,expiryDate:newExpiry,qrNonce:nonce,qrToken:token});
+  // Use single atomic update for all activation fields — include planId if it was selected via fallback
+  const upd={status:'Active',planStart:start,startDate:start,expiryDate:newExpiry,qrNonce:nonce,qrToken:token};
+  if(effectivePlanId && effectivePlanId!==member.planId) upd.planId=effectivePlanId;
+  Members.update(memberId,upd);
   resolveNotifsForMember(memberId);
   _queueSelected.delete(memberId);
   // Ensure cloud sync completes before UI says "confirmed" (cross-device fix)
@@ -4651,6 +4701,8 @@ async function confirmPayment(){
   const err=document.getElementById('confirmPaymentError');
   const btn=document.querySelector('#confirmPaymentModal .btn-primary');
   err.style.display='none';
+  const selPlanEl=document.getElementById('cpm_planSelect');
+  if(selPlanEl && selPlanEl.style.display!=='none' && !selPlanEl.value){ err.textContent='Please select a plan for this member.'; err.style.display='block'; return; }
   if(!memberId||!amount||!method){err.textContent='Please fill in all required fields.';err.style.display='block';return;}
   if(amount<=0){err.textContent='Invalid payment amount.';err.style.display='block';return;}
   if(method==='GCash'&&!reference){err.textContent='Please enter the GCash reference number.';err.style.display='block';return;}
