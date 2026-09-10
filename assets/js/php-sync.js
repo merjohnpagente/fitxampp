@@ -126,6 +126,31 @@
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({action:'create', ...item})
           }).catch(()=>{});
+        } else if (this.storageKey === 'gms_walkins') {
+          // Walk-ins: persist to MySQL so they don't disappear on refresh
+          fetch('api/walkins.php', {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({name: item.visitorName || item.name, contact: item.contact || '', fee: item.fee, date: item.date, notes: item.notes || ''})
+          }).then(r=>r.json()).then(d=>{
+            if(d.id && item.id !== d.id){
+              // update cache with server-generated ID
+              const idx = window.PHP_CACHE.walkins.findIndex(x=>x.id===item.id);
+              if(idx>-1) window.PHP_CACHE.walkins[idx].id = d.id;
+            }
+          }).catch(()=>{});
+        } else if (this.storageKey === 'gms_sessions') {
+          // Trainer Schedule: persist to MySQL
+          fetch('api/sessions.php', {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({action:'create', trainerId: item.trainerId || item.trainer_id, trainerName: item.trainerName || item.trainer_name, memberId: item.memberId || item.member_id, memberName: item.memberName || item.member_name, date: item.date, start: item.start, end: item.end, type: item.type || 'Personal Training', notes: item.notes || ''})
+          }).then(r=>r.json()).then(d=>{
+            if(d.id && item.id !== d.id){
+              const idx = window.PHP_CACHE.sessions.findIndex(x=>x.id===item.id);
+              if(idx>-1) window.PHP_CACHE.sessions[idx].id = d.id;
+            }
+          }).catch(()=>{});
         }
         return item;
       }
