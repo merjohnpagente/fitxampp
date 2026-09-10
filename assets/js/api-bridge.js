@@ -48,9 +48,28 @@
   window.PHP_READY = false;
   window.PHP_READY_PROMISE = null;
 
+  function toCamel(s){ return s.replace(/_([a-z])/g, (m,g)=>g.toUpperCase()); }
+  function normalizeRow(row){
+    if(!row||typeof row!=='object') return row;
+    const out={...row};
+    for(const k in row){
+      if(k.includes('_')){
+        const camel=toCamel(k);
+        if(!(camel in out)) out[camel]=row[k];
+      }
+    }
+    // JSON fields
+    if(typeof out.specializations==='string'){ try{ out.specializations=JSON.parse(out.specializations); out.specializations=out.specializations||[]; }catch(e){} }
+    if(typeof out.available_days==='string'){ try{ out.availableDays=JSON.parse(out.available_days); }catch(e){} }
+    // member aliases
+    if(out.plan_name && !out.planName) out.planName=out.plan_name;
+    if(out.plan_price && !out.planPrice) out.planPrice=out.plan_price;
+    // keep both
+    return out;
+  }
   async function loadAll() {
     try {
-      const [members, plans, payments, users, attendance, walkins, notifications, messages, announcements] = await Promise.all([
+      const [membersRaw, plans, paymentsRaw, usersRaw, attendance, walkins, notifications, messages, announcements] = await Promise.all([
         apiFetch('api/members.php').then(d=>d.members||[]).catch(()=>[]),
         apiFetch('api/plans.php').then(d=>d.plans||[]).catch(()=>[]),
         apiFetch('api/payments.php').then(d=>d.payments||[]).catch(()=>[]),
@@ -61,6 +80,9 @@
         apiFetch('api/messages.php').then(d=>d.messages||[]).catch(()=>[]),
         apiFetch('api/announcements.php').then(d=>d.announcements||[]).catch(()=>[])
       ]);
+      const members = membersRaw.map(normalizeRow);
+      const payments = paymentsRaw.map(normalizeRow);
+      const users = usersRaw.map(normalizeRow);
       PHP_CACHE.members = members;
       PHP_CACHE.plans = plans;
       PHP_CACHE.payments = payments;

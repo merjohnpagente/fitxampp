@@ -2544,25 +2544,34 @@ function refreshMemberTable(){
   const allUsers=Users.all();
   const roleColorMap={admin:'var(--orange)',staff:'#d7ddd8',trainer:'var(--green)'};
   const rows=slice.length?slice.map(m=>{
-    const pl=plans.find(p=>p.id===m.planId);
+    const planId = m.planId || m.plan_id || '';
+    const pl=plans.find(p=>String(p.id).trim().toLowerCase()===String(planId).trim().toLowerCase()) || null;
+    // fallback to embedded plan_name from JOIN when Plans lookup fails
+    const planDisplay = pl ? pl.name : (m.planName || m.plan_name || '—');
     const badgeCls={Active:'badge-active',Expired:'badge-expired',Suspended:'badge-suspended','Expiring Soon':'badge-expiring','pending_payment':'badge-pending'}[m.status]||'badge-suspended';
-    // Created By
-    const createdByUser=m.createdBy?allUsers.find(u=>u.name===m.createdBy||u.username===m.createdByUsername):null;
+    // Created By — handle both camel and snake
+    const createdByVal = m.createdBy || m.created_by || '';
+    const createdByUserName = m.createdByUsername || m.created_by_username || '';
+    const createdByUser=createdByVal?allUsers.find(u=>u.name===createdByVal||u.username===createdByUserName):null;
     const cRoleColor=createdByUser?roleColorMap[createdByUser.role]||'var(--gray-300)':'var(--gray-300)';
     const cRoleTag=createdByUser?`<span style="font-size:9px;font-weight:800;padding:2px 5px;border-radius:4px;background:rgba(255,255,255,.07);color:${cRoleColor};margin-left:4px;text-transform:uppercase">${createdByUser.role}</span>`:'';
-    const createdLine=m.createdBy?`<div style="font-size:12px;font-weight:600;color:var(--gray-100)">${esc(m.createdBy)}${cRoleTag}</div>`:`<span style="font-size:11px;color:var(--gray-500)">—</span>`;
+    const createdLine=createdByVal?`<div style="font-size:12px;font-weight:600;color:var(--gray-100)">${esc(createdByVal)}${cRoleTag}</div>`:`<span style="font-size:11px;color:var(--gray-500)">—</span>`;
     // Edited By
-    const editedByUser=m.editedBy?allUsers.find(u=>u.name===m.editedBy||u.username===m.editedByUsername):null;
+    const editedByVal = m.editedBy || m.edited_by || '';
+    const editedByUserName = m.editedByUsername || m.edited_by_username || '';
+    const editedByUser=editedByVal?allUsers.find(u=>u.name===editedByVal||u.username===editedByUserName):null;
     const eRoleColor=editedByUser?roleColorMap[editedByUser.role]||'var(--gray-300)':'var(--gray-300)';
     const eRoleTag=editedByUser?`<span style="font-size:9px;font-weight:800;padding:2px 5px;border-radius:4px;background:rgba(255,255,255,.07);color:${eRoleColor};margin-left:4px;text-transform:uppercase">${editedByUser.role}</span>`:'';
-    const editedLine=m.editedBy?`<div style="font-size:11px;color:var(--gray-500);margin-top:3px">✎ ${esc(m.editedBy)}${eRoleTag}</div>`:'';
+    const editedLine=editedByVal?`<div style="font-size:11px;color:var(--gray-500);margin-top:3px">✎ ${esc(editedByVal)}${eRoleTag}</div>`:'';
+    const startVal = m.startDate || m.start_date || '';
+    const expiryVal = m.expiryDate || m.expiry_date || '';
     return`<tr>
       <td>${esc(m.id)}</td>
       <td><div style="display:flex;align-items:center;gap:8px"><div class="member-avatar" style="${m.avatar?'background:url(\''+m.avatar+'\') center/cover;background-size:cover;':''}">${m.avatar?'':esc(initials(m.name))}</div>${esc(m.name)}</div></td>
       <td>${esc(m.contact)}</td>
-      <td>${esc(pl?pl.name:'—')}</td>
-      <td>${formatDate(m.startDate)}</td>
-      <td>${formatDate(m.expiryDate)}</td>
+      <td>${esc(planDisplay)}</td>
+      <td>${formatDate(startVal)}</td>
+      <td>${formatDate(expiryVal)}</td>
       <td><span class="badge ${badgeCls}">${esc(m.status)}</span></td>
       <td><div>${createdLine}${editedLine}</div></td>
       <td><div class="td-actions">
@@ -3119,22 +3128,38 @@ function renderBilling(){
 }
 function refreshBillingTable(){
   let data=Payments.all();
-  if(billingSearch){const s=billingSearch.toLowerCase();data=data.filter(p=>p.memberName.toLowerCase().includes(s));}
+  if(billingSearch){const s=billingSearch.toLowerCase();data=data.filter(p=>String(p.memberName||p.member_name||'').toLowerCase().includes(s));}
   if(billingFromDate)data=data.filter(p=>p.date>=billingFromDate);
   if(billingToDate)data=data.filter(p=>p.date<=billingToDate);
-  if(billingPlanFilter!=='All')data=data.filter(p=>p.planId===billingPlanFilter);
+  if(billingPlanFilter!=='All')data=data.filter(p=>String(p.planId||p.plan_id||'')===billingPlanFilter);
   data=data.slice().reverse();
   const perPage=10;const total=data.length;const pages=Math.ceil(total/perPage)||1;
   const slice=data.slice((billingPage-1)*perPage,billingPage*perPage);
-  const rows=slice.length?slice.map(p=>`<tr>
-    <td>${esc(p.id)}</td><td>${esc(p.memberName)}</td><td>${esc(p.planName)}</td>
+  const rows=slice.length?slice.map(p=>{
+    const planName = p.planName || p.plan_name || '—';
+    const newExpiry = p.newExpiry || p.new_expiry || '';
+    const recBy = p.recordedBy || p.recorded_by || '—';
+    const memName = p.memberName || p.member_name || '';
+    const pPlanId = p.planId || p.plan_id || '';
+    let dispPlan = planName;
+    if((!dispPlan || dispPlan==='—') && pPlanId){
+      const allPlans=Plans.all();
+      const found=allPlans.find(x=>String(x.id).trim().toLowerCase()===String(pPlanId).trim().toLowerCase());
+      if(found) dispPlan=found.name;
+    }
+    const src = p.source || '';
+    const syncedAt = p.syncedAt || p.synced_at || '';
+    const srcHtml = src==='renewal'?'<span style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;background:rgba(251,191,36,.15);color:var(--gold);letter-spacing:.5px;border:1px solid rgba(251,191,36,.3)">🔄 RENEWAL</span>':syncedAt?'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:rgba(170,181,255,.12);color:#d7ddd8;letter-spacing:.5px;border:1px solid rgba(170,181,255,.25)" title="Auto-synced when member info was edited">🔗 SYNCED</span>':'<span style="font-size:10px;color:var(--gray-500)">—</span>';
+    return `<tr>
+    <td>${esc(p.id)}</td><td>${esc(memName)}</td><td>${esc(dispPlan)}</td>
     <td style="color:var(--green);font-weight:600">₱${Number(p.amount).toLocaleString()}</td>
-    <td>${formatDate(p.date)}</td><td>${formatDate(p.newExpiry)}</td>
-    <td>${esc(p.recordedBy||'—')}</td><td>${esc(p.method||'—')}</td>
+    <td>${formatDate(p.date)}</td><td>${formatDate(newExpiry)}</td>
+    <td>${esc(recBy)}</td><td>${esc(p.method||'—')}</td>
     <td><span class="badge badge-paid">Paid</span></td>
-    <td>${p.source==='renewal'?'<span style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;background:rgba(251,191,36,.15);color:var(--gold);letter-spacing:.5px;border:1px solid rgba(251,191,36,.3)">🔄 RENEWAL</span>':p.syncedAt?'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:rgba(170,181,255,.12);color:#d7ddd8;letter-spacing:.5px;border:1px solid rgba(170,181,255,.25)" title="Auto-synced when member info was edited">🔗 SYNCED</span>':'<span style="font-size:10px;color:var(--gray-500)">—</span>'}</td>
+    <td>${srcHtml}</td>
     <td><div class="td-actions"><button class="btn-icon" title="View Receipt" onclick="viewReceipt('${p.id}')">🧾</button></div></td>
-  </tr>`).join(''):`<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">💳</div><p>No payments found</p></div></td></tr>`;
+  </tr>`;
+  }).join(''):`<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">💳</div><p>No payments found</p></div></td></tr>`;
   let pag='';if(pages>1){pag=`<div class="pagination"><button class="page-btn" onclick="billingPage=${billingPage-1};refreshBillingTable()" ${billingPage===1?'disabled':''}>‹</button>${Array.from({length:pages},(_,i)=>`<button class="page-btn ${i+1===billingPage?'active':''}" onclick="billingPage=${i+1};refreshBillingTable()">${i+1}</button>`).join('')}<button class="page-btn" onclick="billingPage=${billingPage+1};refreshBillingTable()" ${billingPage===pages?'disabled':''}>›</button><span class="page-info">${total} records</span></div>`;}
   document.getElementById('billingTableCard').innerHTML=`
     <div class="table-header"><h3>Payments <span style="font-size:12px;font-weight:400;color:var(--gray-500);margin-left:6px">${total} record${total!==1?'s':''}</span></h3></div>
