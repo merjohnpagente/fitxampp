@@ -211,8 +211,7 @@ class AuthService{
   async login(username,password){
     if(!username||!password)return{ok:false,error:'Please fill in all required fields.'};
     if(LoginAttempts.get(username)>=LOGIN_MAX_ATTEMPTS)return{ok:false,error:'Account locked. Too many failed attempts — try again in 15 minutes.'};
-    const lower=String(username).toLowerCase().trim();
-    const found=Users.all().find(x=> (x.username&&x.username.toLowerCase()===lower) || (x.email&&String(x.email).toLowerCase()===lower) );
+    const found=Users.all().find(x=>x.username&&x.username.toLowerCase()===username.toLowerCase());
     if(found){
       if(found.status==='locked')return{ok:false,error:'Account locked. Please contact the administrator.'};
       if(found.status==='pending')return{ok:false,error:'Your account is pending admin approval. Please wait.'};
@@ -226,15 +225,13 @@ class AuthService{
           const arr=Users.all(); const idx=arr.findIndex(x=>x.id===found.id); if(idx>-1){arr[idx]=found; Users.save(arr);}
         }
         LoginAttempts.reset(username);
-        if(found.username && found.username.toLowerCase()!==lower) LoginAttempts.reset(found.username);
-        if(found.email && String(found.email).toLowerCase()!==lower) LoginAttempts.reset(found.email);
         this.setSession(found);
         return{ok:true,user:found};
       }
       LoginAttempts.register(username);
       return{ok:false,error:'Invalid username or password.'};
     }
-    const member=Members.all().find(m=> (m.username&&m.username.toLowerCase()===lower) || (m.email&&String(m.email).toLowerCase()===lower) );
+    const member=Members.all().find(m=>m.username&&m.username.toLowerCase()===username.toLowerCase());
     if(member){
       if(member.status==='Archived')return{ok:false,error:'Your account has been archived. Please contact the front desk.'};
       let valid=false;
@@ -248,8 +245,6 @@ class AuthService{
           const arr=Members.all(); const idx=arr.findIndex(x=>x.id===member.id); if(idx>-1 && arr[idx].password) { delete arr[idx].password; Members.save(arr); }
         }
         LoginAttempts.reset(username);
-        if(member.username && member.username.toLowerCase()!==lower) LoginAttempts.reset(member.username);
-        if(member.email && String(member.email).toLowerCase()!==lower) LoginAttempts.reset(member.email);
         const sess={id:member.id,email:member.email||'',username:member.username,name:member.name,contact:member.contact,role:'member',memberId:member.id,status:member.status};
         this.setSession(sess);
         return{ok:true,user:sess};
@@ -4586,24 +4581,33 @@ async function openConfirmPayment(memberId){
     try{ await window.PHP_READY_PROMISE; }catch(e){}
   }
   let plan=m.planId?Plans.one(m.planId):null;
-  // fallback: check PHP_CACHE directly
+  const pidTrim = String(m.planId||'').trim();
+  // fallback: check PHP_CACHE directly (trim + case-insensitive)
   if(!plan && window.PHP_CACHE && window.PHP_CACHE.plans){
-    plan = window.PHP_CACHE.plans.find(p=>p.id===m.planId) || null;
+    plan = window.PHP_CACHE.plans.find(p=>String(p.id).trim().toLowerCase()===pidTrim.toLowerCase()) || null;
   }
+  if(!plan && pidTrim) plan = Plans.all().find(p=>String(p.id).trim().toLowerCase()===pidTrim.toLowerCase()) || null;
   // fallback: fetch live from API if still missing
-  if(!plan && window.USE_PHP && m.planId){
+  if(!plan && window.USE_PHP && pidTrim){
     try{
       const r=await fetch('api/plans.php',{credentials:'same-origin'});
       const d=await r.json();
-      if(d.plans) plan=d.plans.find(p=>p.id===m.planId)||null;
+      if(d.plans) plan=d.plans.find(p=>String(p.id).trim().toLowerCase()===pidTrim.toLowerCase())||null;
     }catch(e){}
   }
-  // fallback selector if plan still not found (e.g. plan deleted or pending without plan)
+  // hard-coded automatic fallback for known plans (para automatic gihapon bisag wala sa cache)
+  if(!plan && pidTrim){
+    const hardCoded={pl1:{id:'pl1',name:'Basic',price:500,duration:1}, pl2:{id:'pl2',name:'Standard',price:900,duration:1}, pl3:{id:'pl3',name:'Premium',price:1500,duration:3}};
+    const hc=hardCoded[pidTrim.toLowerCase()];
+    if(hc) plan=hc;
+  }
+  // fallback selector ONLY if plan still truly not found — automatic na, dili na "Plan not found" warning, just show selector silently
   let planSelectorHtml='';
   if(!plan){
     const allPlans = (window.PHP_CACHE && window.PHP_CACHE.plans && window.PHP_CACHE.plans.length) ? window.PHP_CACHE.plans : Plans.all();
     const opts = allPlans.filter(p=>p.status==='Active' || !p.status).map(p=>`<option value="${p.id}" ${p.id===m.planId?'selected':''}>${esc(p.name)} - ₱${Number(p.price).toLocaleString()} (${p.duration}mo)</option>`).join('');
-    planSelectorHtml = `<div style="margin-top:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">⚠ Plan not found — please select</div><select id="cpm_planSelect" style="width:100%;padding:9px 10px;background:var(--navy-700);border:1.5px solid var(--navy-600);border-radius:8px;color:var(--white);outline:none" onchange="onCpmPlanChange()"><option value="">Select plan</option>${opts}</select></div>`;
+    // automatic: dili na warning, just let staff select — pero plan details will auto-fill once selected
+    planSelectorHtml = `<div style="margin-top:10px;background:rgba(127,250,136,.06);border:1px solid rgba(127,250,136,.18);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--gray-500);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Select Plan (auto)</div><select id="cpm_planSelect" style="width:100%;padding:9px 10px;background:var(--navy-700);border:1.5px solid var(--navy-600);border-radius:8px;color:var(--white);outline:none" onchange="onCpmPlanChange()"><option value="">Select plan</option>${opts}</select></div>`;
   }
   document.getElementById('cpm_memberId').value=memberId;
   document.getElementById('confirmPaymentError').style.display='none';
